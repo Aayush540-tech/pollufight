@@ -18,7 +18,7 @@ export interface AnalysisResult {
 
 import { getApiBaseUrl } from '../config/api';
 
-const API_URL = `${getApiBaseUrl(8000)}/analyze`;
+const API_URL = `${getApiBaseUrl(8000)}/api/pollution/analyze`;
 
 export async function analyzeImage(imageUrl: string, originalFilename?: string): Promise<AnalysisResult> {
   try {

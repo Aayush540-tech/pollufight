@@ -29,7 +29,7 @@ export interface DashboardReport {
 
 import { getApiBaseUrl } from '../config/api';
 
-const API_URL = `${getApiBaseUrl(8001)}/analyze`;
+const API_URL = `${getApiBaseUrl(8000)}/api/policy/analyze`;
 
 export const DEMO_COMMENTS = [
   "The smoke from the Northside chemical plant is getting unbearable on Tuesday mornings. My kids have started coughing more.",
