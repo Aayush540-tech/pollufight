@@ -300,6 +300,13 @@ function ProcessingView({ state, progress }: { state: string; progress: number }
 }
 
 function ResultView({ result, onReset }: { result: AnalysisResult; onReset: () => void }) {
+  const handleEmailClick = () => {
+    const recipient = "thenobleonevision070@gmail.com";
+    const subject = encodeURIComponent(`Official Complaint: ${result.pollution_type}`);
+    const body = encodeURIComponent(result.legal_draft);
+    window.location.href = `mailto:${recipient}?subject=${subject}&body=${body}`;
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
@@ -359,6 +366,10 @@ function ResultView({ result, onReset }: { result: AnalysisResult; onReset: () =
         <Button onClick={() => { }} className="w-full bg-neon-green text-background hover:bg-neon-green/90 font-mono tracking-wider">
           <FileText className="w-4 h-4 mr-2" />
           FILE OFFICIAL COMPLAINT
+        </Button>
+        <Button onClick={handleEmailClick} className="w-full bg-blue-500 text-white hover:bg-blue-600 font-mono tracking-wider">
+          <FileText className="w-4 h-4 mr-2" />
+          SEND VIA EMAIL
         </Button>
         <Button onClick={onReset} variant="outline" className="w-full border-border hover:bg-secondary font-mono tracking-wider">
           <RotateCcw className="w-4 h-4 mr-2" />

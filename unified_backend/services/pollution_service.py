@@ -107,7 +107,7 @@ async def detect_pollution(image: Optional[Image.Image] = None, filename: str = 
         return {
             "pollution_type": "Image Required",
             "confidence_level": 0.0,
-            "details": [{"label": "Error", "score": 0.0, "source": "System: No image provided"}]
+            "details": [{"label": "Error", "score": 0.0, "source": "System: No image provided", "pollution_type": "Error"}]
         }
 
     try:
@@ -217,5 +217,5 @@ async def detect_pollution(image: Optional[Image.Image] = None, filename: str = 
         return {
             "pollution_type": "Error During Detection",
             "confidence_level": 0.0,
-            "details": [{"label": "Error", "score": 0.0, "source": str(e)}]
+            "details": [{"label": "Error", "score": 0.0, "source": str(e), "pollution_type": "Error"}]
         }

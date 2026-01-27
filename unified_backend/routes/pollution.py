@@ -37,6 +37,7 @@ async def analyze_image(
                 # Simulate analysis time for better UX
                 await asyncio.sleep(2)
                 image = None
+                filename = original_filename or "demo_unknown.jpg"
             else:
                 headers = {
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
