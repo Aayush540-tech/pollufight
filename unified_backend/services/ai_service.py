@@ -19,7 +19,7 @@ class HuggingFaceService:
     """Shared service for all Hugging Face API calls."""
     
     def __init__(self):
-        self.token = HUGGINGFACE_API_TOKEN
+        self.token = HUGGINGFACE_API_TOKEN.strip() if HUGGINGFACE_API_TOKEN else None
         self.base_url = HUGGINGFACE_BASE_URL
         self.timeout = API_TIMEOUT
         

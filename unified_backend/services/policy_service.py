@@ -69,16 +69,35 @@ Return ONLY JSON:
     
     data = parse_json_garbage(resp) if resp else None
     
-    if data:
-        state["vibe_check"] = SentimentDistribution(
-            support=data.get("support", 72),
-            neutral=data.get("neutral", 18),
-            oppose=data.get("oppose", 10)
-        )
-        state["deep_sentiment"] = DeepSentiment(
-            insight=data.get("insight", "Significant concern detected."),
-            reasoning=data.get("reasoning", "Extracted from comment patterns.")
-        )
+    # Handle list response (sometimes LLM returns [{},{},...])
+    if isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict):
+        data = data[0]
+        
+    if data and isinstance(data, dict):
+        try:
+            # Safe parsing helper
+            def safe_float(val, default):
+                try:
+                    return float(val)
+                except (ValueError, TypeError):
+                    return default
+
+            state["vibe_check"] = SentimentDistribution(
+                support=safe_float(data.get("support"), 72),
+                neutral=safe_float(data.get("neutral"), 18),
+                oppose=safe_float(data.get("oppose"), 10)
+            )
+            state["deep_sentiment"] = DeepSentiment(
+                insight=str(data.get("insight", "Significant concern detected.")),
+                reasoning=str(data.get("reasoning", "Extracted from comment patterns."))
+            )
+        except Exception as e:
+            logger.error(f"Error parsing sentiment data: {e}")
+            state["vibe_check"] = SentimentDistribution(support=72, neutral=18, oppose=10)
+            state["deep_sentiment"] = DeepSentiment(
+                insight="Error analyzing sentiment",
+                reasoning="Data format issue."
+            )
     else:
         state["vibe_check"] = SentimentDistribution(support=72, neutral=18, oppose=10)
         state["deep_sentiment"] = DeepSentiment(
@@ -110,15 +129,35 @@ Return ONLY JSON list:
     
     data = parse_json_garbage(resp) if resp else None
     
+    # Handle wrapped list inside dict if applicable, but we expect a list
+    if isinstance(data, dict):
+        # Maybe it put the list under a key?
+        for key in ["themes", "pillars", "data", "list"]:
+             if key in data and isinstance(data[key], list):
+                 data = data[key]
+                 break
+    
     if data and isinstance(data, list):
         pillars = []
         for item in data[:5]:
             if not isinstance(item, dict):
                 continue
-            theme = item.get("theme", item.get("topic", "General"))
-            mentions = item.get("mentions", item.get("count", 1))
-            summary = item.get("summary", item.get("description", "Insight extracted from comments."))
+            
+            # Safe parsing
+            def safe_int(val, default):
+                try:
+                    return int(val)
+                except (ValueError, TypeError):
+                    return default
+
+            theme = str(item.get("theme", item.get("topic", "General")))
+            mentions = safe_int(item.get("mentions", item.get("count", 1)), 1)
+            summary = str(item.get("summary", item.get("description", "Insight extracted from comments.")))
             pillars.append(ThemePillar(theme=theme, mentions=mentions, summary=summary))
+        
+        if not pillars:
+             pillars.append(ThemePillar(theme="General", mentions=len(state["comments"]), summary="Analysis in progress."))
+             
         state["theme_map"] = pillars
     else:
         state["theme_map"] = [
@@ -153,14 +192,25 @@ Return ONLY JSON list:
     
     data = parse_json_garbage(resp) if resp else None
     
+    # Handle wrapped list inside dict if applicable
+    if isinstance(data, dict):
+         for key in ["innovations", "ideas", "suggestions", "list"]:
+             if key in data and isinstance(data[key], list):
+                 data = data[key]
+                 break
+
     if data and isinstance(data, list):
         innovations = []
         for item in data[:3]:
             if not isinstance(item, dict):
                 continue
-            idea = item.get("idea", item.get("suggestion", "New Concept"))
-            context = item.get("context", item.get("description", item.get("reasoning", "Derived from community feedback.")))
+            idea = str(item.get("idea", item.get("suggestion", "New Concept")))
+            context = str(item.get("context", item.get("description", item.get("reasoning", "Derived from community feedback."))))
             innovations.append(Innovation(idea=idea, context=context))
+            
+        if not innovations:
+            innovations.append(Innovation(idea="Innovation Check", context="No unique ideas found yet."))
+            
         state["innovation_spotter"] = innovations
     else:
         state["innovation_spotter"] = [
