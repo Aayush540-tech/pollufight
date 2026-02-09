@@ -3,9 +3,9 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables
+# Load environment variables from project root
 current_dir = Path(__file__).parent.absolute()
-env_path = current_dir / ".env"
+env_path = current_dir.parent / ".env"  # Go up to project root
 load_dotenv(dotenv_path=env_path)
 
 # Hugging Face Configuration

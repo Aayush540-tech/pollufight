@@ -138,6 +138,10 @@ async def detect_pollution(image: Optional[Image.Image] = None, filename: str = 
                 score = item.get('score', 0.0)
                 box = item.get('box')
                 
+                # Convert box from dict to list format if needed
+                if box and isinstance(box, dict):
+                    box = [box.get('xmin', 0), box.get('ymin', 0), box.get('xmax', 0), box.get('ymax', 0)]
+                
                 pollution_type = map_label_to_pollution(label)
                 detected_items.append({
                     "label": label,
