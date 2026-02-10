@@ -16,6 +16,22 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+@router.get("/geodecode")
+async def geodecode(lat: float, lon: float):
+    """Proxy reverse geocoding request to Nominatim."""
+    try:
+        url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
+        headers = {
+            "User-Agent": "Jan-Kavch-Pollufight-App (Technical Backend Proxy)"
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        logger.error(f"Geocoding error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to geodecode coordinates")
+
+
 @router.post("/analyze", response_model=AnalysisResponse)
 async def analyze_image(
     file: Optional[UploadFile] = File(None),

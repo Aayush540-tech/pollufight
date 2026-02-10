@@ -6,6 +6,8 @@ import { Camera, RotateCcw, Upload, FileText, Activity, AlertTriangle, CheckCirc
 import { Button } from "@/components/ui/button"
 import { uploadToCloudinary } from "@/services/cloudinary-service"
 import { analyzeImage, type AnalysisResult } from "@/services/pollution-service"
+import { getApiBaseUrl } from "@/config/api"
+import { db } from "@/lib/firebase"
 
 type LensState = "capture" | "uploading" | "analyzing" | "verified" | "error"
 
@@ -47,22 +49,19 @@ export function AILens() {
 
   const reverseGeocode = async (lat: number, lon: number) => {
     try {
+      const baseUrl = getApiBaseUrl(8000);
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`,
-        {
-          headers: {
-            'Accept-Language': 'en',
-            'User-Agent': 'Jan-Kavch-Pollufight-App'
-          }
-        }
+        `${baseUrl}/api/pollution/geodecode?lat=${lat}&lon=${lon}`
       );
       const data = await response.json();
       const address = data.address || {};
       return {
-        city: address.city || address.town || address.village || address.suburb || "Unknown City",
-        state: address.state || "Unknown State",
-        zipcode: address.postcode || "000000",
-        address: data.display_name || "Unknown Address"
+        city: address.city || address.town || address.village || address.suburb || "Delhi",
+        state: address.state || "Delhi",
+        zipcode: address.postcode || "110001",
+        address: data.display_name || "New Delhi, India",
+        lat,
+        lon
       };
     } catch (error) {
       console.error("Reverse geocoding error:", error);
@@ -133,6 +132,28 @@ export function AILens() {
       // Analyze with Pollution Detector
       const result = await analyzeImage(imageUrl, file.name, capturedLocation || undefined)
       setAnalysisResult(result)
+
+      // Save to Firestore for mapping (GUILTY MAP)
+      if (result.pollution_type !== "No obvious pollution detected" && result.pollution_type !== "Error") {
+        try {
+          const { addDoc, collection, serverTimestamp } = await import("firebase/firestore");
+          await addDoc(collection(db, "pollution_reports"), {
+            latitude: capturedLocation?.lat || 28.4595, // Fallback to Gurgaon if GPS fails
+            longitude: capturedLocation?.lon || 77.0266,
+            type: result.pollution_type.includes("Industrial") ? "Industrial" :
+              result.pollution_type.includes("Vehicle") ? "Industrial" : "Construction", // Simplified categorization for map filter
+            site: result.pollution_type,
+            status: "detected", // Initial status as requested
+            severity: "critical", // Just detected = critical/red as per logic
+            timestamp: serverTimestamp(),
+            imageUrl: imageUrl
+          });
+          console.log("Incident pinned to map successfully.");
+        } catch (fError) {
+          console.error("Failed to pin incident to map:", fError);
+        }
+      }
+
       setProgress(100)
 
       setState("verified")
