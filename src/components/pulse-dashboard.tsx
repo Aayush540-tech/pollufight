@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 // import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs" // Removed unused import
-import { analyzeComments, type DashboardReport, DEMO_COMMENTS } from "@/services/policy-service"
+import { analyzeComments, type DashboardReport } from "@/services/policy-service"
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Cell } from "recharts"
 
 import { CriticalGauge } from "./critical-gauge"
@@ -26,7 +26,7 @@ export function PulseDashboard() {
     setError(null)
     try {
       // Use demo comments for now as per plan
-      const result = await analyzeComments(DEMO_COMMENTS)
+      const result = await analyzeComments()
       setReport(result)
     } catch (err) {
       setError(`Failed to connect to Policy Engine: ${err instanceof Error ? err.message : String(err)}`)
@@ -162,7 +162,7 @@ export function PulseDashboard() {
                         />
                         <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={30}>
                           {
-                            [0, 1, 2].map((entry, index) => (
+                            [0, 1, 2].map((_, index) => (
                               <Cell key={`cell-${index}`} fill={COLORS[index]} />
                             ))
                           }

@@ -161,13 +161,31 @@ function CaptureView({ onCapture, onUpload }: { onCapture: (file: File) => void;
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current
       const canvas = canvasRef.current
-      // Set canvas dimensions to match video stream
-      canvas.width = video.videoWidth
-      canvas.height = video.videoHeight
+
+      // Target dimensions (Full HD style optimization)
+      const MAX_DIM = 1080
+      let width = video.videoWidth
+      let height = video.videoHeight
+
+      // Calculate scale to fit within MAX_DIM while maintaining aspect ratio
+      if (width > MAX_DIM || height > MAX_DIM) {
+        if (width > height) {
+          height = Math.round((height * MAX_DIM) / width)
+          width = MAX_DIM
+        } else {
+          width = Math.round((width * MAX_DIM) / height)
+          height = MAX_DIM
+        }
+      }
+
+      // Set canvas dimensions to optimized size
+      canvas.width = width
+      canvas.height = height
 
       const ctx = canvas.getContext('2d')
       if (ctx) {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+        // Draw the current video frame into the downscaled canvas
+        ctx.drawImage(video, 0, 0, width, height)
         canvas.toBlob((blob) => {
           if (blob) {
             const file = new File([blob], `capture-${Date.now()}.jpg`, { type: "image/jpeg" })
