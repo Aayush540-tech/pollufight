@@ -18,12 +18,6 @@ const DEMO_KEYWORDS = [
 ];
 
 export function AILens() {
-  const [locationData, setLocationData] = useState<{
-    city?: string;
-    state?: string;
-    zipcode?: string;
-    address?: string;
-  } | null>(null)
 
   const getDeviceLocation = (): Promise<{ lat: number; lon: number } | null> => {
     return new Promise((resolve) => {
@@ -125,9 +119,6 @@ export function AILens() {
 
       // Wait for location to finish if it hasn't already
       capturedLocation = await locPromise;
-      if (capturedLocation) {
-        setLocationData(capturedLocation);
-      }
 
       // Analyze with Pollution Detector
       const result = await analyzeImage(imageUrl, file.name, capturedLocation || undefined)
