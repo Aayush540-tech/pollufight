@@ -8,10 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Textarea } from "@/components/ui/textarea"
 import { db } from "@/lib/firebase"
 import { collection, addDoc, serverTimestamp } from "firebase/firestore"
+import { useAuth } from "@/context/AuthContext"
+import { AuthModal } from "../AuthModal"
 
 export function VoiceMatter() {
+    const { user } = useAuth()
     const [comment, setComment] = useState("")
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
     const [isSuccess, setIsSuccess] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
@@ -26,7 +30,8 @@ export function VoiceMatter() {
             await addDoc(collection(db, "comments"), {
                 text: comment.trim(),
                 timestamp: serverTimestamp(),
-                author: "Citizen",
+                author: user?.displayName || "Citizen",
+                userId: user?.uid || null,
             })
 
             setIsSuccess(true)
@@ -50,8 +55,8 @@ export function VoiceMatter() {
                         viewport={{ once: true }}
                         className="text-center mb-12"
                     >
-                        <h2 className="text-4xl md:text-5xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400">
-                            Your Voice Matters
+                        <h2 className="text-4xl md:text-5xl font-bold mb-4">
+                            <span className="text-orange-500">Your</span> Voice <span className="text-green-500">Matters!</span>
                         </h2>
                         <p className="text-lg text-muted-foreground/80 max-w-2xl mx-auto">
                             Share your insights, concerns, or ideas with us. Your feedback directly
@@ -135,7 +140,18 @@ export function VoiceMatter() {
                                 <div className="flex flex-wrap gap-6 pt-4 border-t border-white/5">
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground/70">
                                         <User className="h-4 w-4" />
-                                        <span>Anonymous Submission</span>
+                                        <span>
+                                            {user ? (
+                                                <span className="text-emerald-400 font-mono">OFFICER: {user.displayName}</span>
+                                            ) : (
+                                                <button
+                                                    onClick={() => setIsAuthModalOpen(true)}
+                                                    className="hover:text-emerald-400 transition-colors underline decoration-dotted"
+                                                >
+                                                    SIGN IN TO IDENTIFY
+                                                </button>
+                                            )}
+                                        </span>
                                     </div>
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground/70">
                                         <Clock className="h-4 w-4" />
@@ -147,6 +163,8 @@ export function VoiceMatter() {
                     </motion.div>
                 </div>
             </div>
+
+            <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
         </section>
     )
 }

@@ -39,6 +39,11 @@
   --blue-accent: oklch(0.55 0.15 220);
   --cyan-accent: oklch(0.7 0.15 200);
 
+  /* Orange Theme vars */
+  --orange-primary: oklch(0.7 0.2 45);
+  --orange-glow: oklch(0.75 0.18 55);
+  --amber-accent: oklch(0.8 0.15 75);
+
   /* PolluFight tactical colors */
   --neon-green: oklch(0.75 0.25 165);
   --neon-red: oklch(0.65 0.28 25);

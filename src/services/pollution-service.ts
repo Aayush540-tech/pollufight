@@ -28,7 +28,8 @@ export async function analyzeImage(
     state?: string;
     zipcode?: string;
     address?: string;
-  }
+  },
+  userName?: string
 ): Promise<AnalysisResult> {
   try {
     console.log('Analyzing image via HTTP:', imageUrl);
@@ -44,6 +45,10 @@ export async function analyzeImage(
       if (locationData.state) formData.append('state', locationData.state);
       if (locationData.zipcode) formData.append('zipcode', locationData.zipcode);
       if (locationData.address) formData.append('address', locationData.address);
+    }
+
+    if (userName) {
+      formData.append('user_name', userName);
     }
 
     const response = await fetch(API_URL, {

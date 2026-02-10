@@ -40,7 +40,8 @@ async def analyze_image(
     city: Optional[str] = Form(None),
     state: Optional[str] = Form(None),
     zipcode: Optional[str] = Form(None),
-    address: Optional[str] = Form(None)
+    address: Optional[str] = Form(None),
+    user_name: Optional[str] = Form(None)
 ):
     """Analyze image for pollution detection."""
     try:
@@ -89,7 +90,12 @@ async def analyze_image(
                 "zipcode": zipcode,
                 "address": address
             }
-            legal_draft = generate_legal_draft(pollution_type, details, location_data)
+            legal_draft = generate_legal_draft(
+                pollution_type, 
+                details, 
+                location_data, 
+                user_name=user_name or "Concerned Citizen"
+            )
 
         return AnalysisResponse(
             pollution_type=pollution_type,

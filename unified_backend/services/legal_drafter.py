@@ -5,7 +5,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def generate_legal_draft(pollution_type: str, details: list, location_data: dict = None) -> str:
+def generate_legal_draft(pollution_type: str, details: list, location_data: dict = None, user_name: str = "Concerned Citizen") -> str:
     """
     Generates a deterministic legal draft based on the detected pollution type.
     """
@@ -74,7 +74,7 @@ Please treat this as an urgent matter affecting public health.
 
 Sincerely,
 
-[Your User Name]
-Concerned Citizen
+{user_name}
+
 """
     return template

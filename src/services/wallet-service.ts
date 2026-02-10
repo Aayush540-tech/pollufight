@@ -2,8 +2,8 @@ import { db } from "@/lib/firebase"
 import { doc, updateDoc, increment, setDoc, getDoc } from "firebase/firestore"
 import { getUserId } from "@/lib/user-id"
 
-export async function awardCredits(amount: number): Promise<void> {
-    const userId = getUserId()
+export async function awardCredits(amount: number, customUserId?: string): Promise<void> {
+    const userId = customUserId || getUserId()
     const userRef = doc(db, "user_credits", userId)
 
     try {

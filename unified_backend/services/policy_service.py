@@ -55,8 +55,14 @@ async def analyze_sentiment(state: AgentState):
 Comments:
 {comments_text}
 
-Return ONLY JSON:
-{{"support": 0-100, "neutral": 0-100, "oppose": 0-100, "insight": "string", "reasoning": "string"}}"""
+Return ONLY JSON in this format:
+{{
+  "support": 70,
+  "neutral": 20,
+  "oppose": 10,
+  "insight": "The community is primarily concerned about...",
+  "reasoning": "Mentions of smoke and drainage indicate..."
+}}"""
     
     # Run async function in async context
     resp = await ai_service.generate_text(
@@ -87,10 +93,14 @@ Return ONLY JSON:
                 neutral=safe_float(data.get("neutral"), 18),
                 oppose=safe_float(data.get("oppose"), 10)
             )
+            insight = data.get("insight") or data.get("detailed_analysis_of_vibe") or "Significant concern detected."
+            reasoning = data.get("reasoning") or data.get("evidence_from_comments") or "Extracted from comment patterns."
+            
             state["deep_sentiment"] = DeepSentiment(
-                insight=str(data.get("insight", "Significant concern detected.")),
-                reasoning=str(data.get("reasoning", "Extracted from comment patterns."))
+                insight=str(insight),
+                reasoning=str(reasoning)
             )
+            logger.info(f"Analyzed sentiment: {state['vibe_check']}")
         except Exception as e:
             logger.error(f"Error parsing sentiment data: {e}")
             state["vibe_check"] = SentimentDistribution(support=72, neutral=18, oppose=10)
@@ -116,8 +126,11 @@ async def cluster_themes(state: AgentState):
 Comments:
 {comments_text}
 
-Return ONLY JSON list:
-[{{"theme": "name", "mentions": count, "summary": "text"}}]"""
+Return ONLY a JSON list in this format:
+[
+  {{"theme": "Air Quality", "mentions": 15, "summary": "Residents are reporting smoke and odors from factories."}},
+  {{"theme": "Waste Management", "mentions": 8, "summary": "Concerns regarding illegal dumping in wetlands."}}
+]"""
 
     
     
@@ -155,10 +168,13 @@ Return ONLY JSON list:
             summary = str(item.get("summary", item.get("description", "Insight extracted from comments.")))
             pillars.append(ThemePillar(theme=theme, mentions=mentions, summary=summary))
         
-        if not pillars:
-             pillars.append(ThemePillar(theme="General", mentions=len(state["comments"]), summary="Analysis in progress."))
-             
-        state["theme_map"] = pillars
+        state["theme_map"] = pillars if pillars else [
+            ThemePillar(
+                theme="General",
+                mentions=len(state["comments"]),
+                summary="Common community concerns grouped by AI."
+            )
+        ]
     else:
         state["theme_map"] = [
             ThemePillar(
@@ -179,8 +195,11 @@ async def spot_innovation(state: AgentState):
 Comments:
 {comments_text}
 
-Return ONLY JSON list:
-[{{"idea": "name", "context": "text"}}]"""
+Return ONLY a JSON list in this format:
+[
+  {{"idea": "Bio-filtration Systems", "context": "One resident suggested using plants to filter drainage basins."}},
+  {{"idea": "Solar Factory Credits", "context": "A citizen proposed tax incentives for green energy transitions."}}
+]"""
 
     
     
@@ -208,10 +227,9 @@ Return ONLY JSON list:
             context = str(item.get("context", item.get("description", item.get("reasoning", "Derived from community feedback."))))
             innovations.append(Innovation(idea=idea, context=context))
             
-        if not innovations:
-            innovations.append(Innovation(idea="Innovation Check", context="No unique ideas found yet."))
-            
-        state["innovation_spotter"] = innovations
+        state["innovation_spotter"] = innovations if innovations else [
+            Innovation(idea="Community Ideas", context="AI is searching for unique suggestions in the feedback.")
+        ]
     else:
         state["innovation_spotter"] = [
             Innovation(idea="Innovation Check", context="No unique ideas found yet.")

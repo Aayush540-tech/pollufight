@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { ArrowUp, Clock, Car, Factory, Banknote, Award, Plus, Minus, HardHat } from "lucide-react"
+import { ArrowUp, Clock, Car, Factory, Banknote, Award, Plus, Minus, HardHat, User as UserIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { doc, onSnapshot, updateDoc, increment, setDoc, query, collection, where, orderBy, QuerySnapshot, DocumentData } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { getUserId } from "@/lib/user-id"
+import { useAuth } from "@/context/AuthContext"
+import { AuthModal } from "./AuthModal"
 
 const TYPE_ICONS: Record<string, any> = {
   "Vehicle Emission": Car,
@@ -35,14 +37,16 @@ function AnimatedCheckmark({ delay }: { delay: number }) {
 }
 
 export function EcoWallet() {
+  const { user, logout } = useAuth()
   const [displayCredits, setDisplayCredits] = useState(0)
-  const [flashingCard, setFlashingCard] = useState<string | null>(null)
   const [userId, setUserId] = useState<string>("")
   const [history, setHistory] = useState<any[]>([])
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
 
   // Fetch/Create User and Subscribe to Credits
   useEffect(() => {
-    const id = getUserId()
+    // Priority: Authenticated User ID > Local Storage User ID
+    const id = user?.uid || getUserId()
     setUserId(id)
     const userRef = doc(db, "user_credits", id)
 
@@ -116,17 +120,46 @@ export function EcoWallet() {
     }
   }
 
-  useEffect(() => {
-    // We can remove the flashing demo logic since cards are now real or remove it
-    // setFlashingCard("demo") // if we had a string ID
-  }, [])
 
   return (
     <div className="p-4 space-y-6">
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center">
-        <h2 className="font-mono text-lg tracking-widest text-foreground">ECOWALLET</h2>
+      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex justify-between items-center bg-card/30 p-4 rounded-2xl border border-border">
+        <div className="flex flex-col items-start">
+          <h2 className="font-mono text-lg tracking-widest text-foreground">ECOWALLET</h2>
+          {user && (
+            <p className="font-mono text-[10px] text-primary uppercase tracking-widest mt-1">
+              Officer: {user.displayName || "Anonymous Scout"}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {user ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => logout()}
+              className="font-mono text-[10px] uppercase tracking-tighter h-8"
+            >
+              Sign Out
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsAuthModalOpen(true)}
+              className="font-mono text-[10px] uppercase tracking-tighter h-8 border-primary text-primary hover:bg-primary/10"
+            >
+              Link Account
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" className="rounded-full">
+            <UserIcon className="w-5 h-5 text-foreground" />
+          </Button>
+        </div>
       </motion.div>
+
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
 
       {/* Credits Card */}
       <motion.div
@@ -181,10 +214,7 @@ export function EcoWallet() {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.3 + index * 0.1 }}
-                className={`flex items-center justify-between p-4 rounded-xl border bg-card/30 transition-all ${flashingCard === item.id
-                  ? "border-neon-green shadow-[0_0_15px_3px_var(--neon-green)]"
-                  : "border-border"
-                  }`}
+                className={`flex items-center justify-between p-4 rounded-xl border bg-card/30 transition-all border-border`}
               >
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-muted">

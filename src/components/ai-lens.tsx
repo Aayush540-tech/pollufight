@@ -10,6 +10,8 @@ import { getApiBaseUrl } from "@/config/api"
 import { db } from "@/lib/firebase"
 import { awardCredits } from "@/services/wallet-service"
 import { getUserId } from "@/lib/user-id"
+import { useAuth } from "@/context/AuthContext"
+import { AuthModal } from "./AuthModal"
 
 type LensState = "capture" | "uploading" | "analyzing" | "verified" | "error"
 
@@ -65,10 +67,12 @@ export function AILens() {
     }
   };
 
+  const { user } = useAuth()
   const [state, setState] = useState<LensState>("capture")
   const [progress, setProgress] = useState(0)
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
   const [errorMsg, setErrorMsg] = useState<string>("")
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Handle file selection from input
@@ -123,7 +127,12 @@ export function AILens() {
       capturedLocation = await locPromise;
 
       // Analyze with Pollution Detector
-      const result = await analyzeImage(imageUrl, file.name, capturedLocation || undefined)
+      const result = await analyzeImage(
+        imageUrl,
+        file.name,
+        capturedLocation || undefined,
+        user?.displayName || "Officer"
+      )
       setAnalysisResult(result)
 
       // Save to Firestore for mapping (GUILTY MAP)
@@ -131,13 +140,13 @@ export function AILens() {
         try {
           // Award credits for high confidence reports
           if (result.confidence_level > 0.8) {
-            console.log("High confidence detection (>90%). Awarding 50 credits!");
-            await awardCredits(50);
+            console.log("High confidence detection (>80%). Awarding 50 credits!");
+            await awardCredits(50, user?.uid);
           }
 
           const { addDoc, collection, serverTimestamp } = await import("firebase/firestore");
           await addDoc(collection(db, "pollution_reports"), {
-            userId: getUserId(), // Associate report with the user
+            userId: user?.uid || getUserId(), // Associate report with the user (Auth UID or Guest ID)
             latitude: capturedLocation?.lat || 28.4595, // Fallback to Gurgaon if GPS fails
             longitude: capturedLocation?.lon || 77.0266,
             type: result.pollution_type.includes("Industrial") ? "Industrial" :
@@ -184,11 +193,27 @@ export function AILens() {
       />
 
       <AnimatePresence mode="wait">
-        {state === "capture" && <CaptureView key="capture" onCapture={handleCameraCapture} onUpload={handleUploadClick} />}
-        {(state === "uploading" || state === "analyzing") && <ProcessingView key="processing" state={state} progress={progress} />}
-        {state === "verified" && analysisResult && <ResultView key="result" result={analysisResult} onReset={handleReset} />}
-        {state === "error" && <ErrorView key="error" message={errorMsg} onRetry={handleReset} />}
+        {!user ? (
+          <LoginRequiredView key="login-required" onLogin={() => setIsAuthModalOpen(true)} />
+        ) : (
+          <>
+            {state === "capture" && <CaptureView key="capture" onCapture={handleCameraCapture} onUpload={handleUploadClick} />}
+            {(state === "uploading" || state === "analyzing") && <ProcessingView key="processing" state={state} progress={progress} />}
+            {state === "verified" && analysisResult && (
+              <ResultView
+                key="result"
+                result={analysisResult}
+                onReset={handleReset}
+                isGuest={!user}
+                onAuthClick={() => setIsAuthModalOpen(true)}
+              />
+            )}
+            {state === "error" && <ErrorView key="error" message={errorMsg} onRetry={handleReset} />}
+          </>
+        )}
       </AnimatePresence>
+
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
     </div>
   )
 }
@@ -407,7 +432,17 @@ function ProcessingView({ state, progress }: { state: string; progress: number }
   )
 }
 
-function ResultView({ result, onReset }: { result: AnalysisResult; onReset: () => void }) {
+function ResultView({
+  result,
+  onReset,
+  isGuest,
+  onAuthClick
+}: {
+  result: AnalysisResult;
+  onReset: () => void;
+  isGuest: boolean;
+  onAuthClick: () => void;
+}) {
   const handleEmailClick = () => {
     const recipient = "thenobleonevision070@gmail.com";
     const subject = encodeURIComponent(`Official Complaint: ${result.pollution_type}`);
@@ -433,6 +468,27 @@ function ResultView({ result, onReset }: { result: AnalysisResult; onReset: () =
       </div>
 
       <div className="space-y-4 mb-6">
+        {isGuest && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-3 bg-primary/10 border border-primary/20 rounded-xl flex items-center justify-between"
+          >
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-primary" />
+              <p className="text-[10px] font-mono text-primary uppercase font-bold">Unauthenticated Session</p>
+            </div>
+            <Button
+              variant="link"
+              size="sm"
+              onClick={onAuthClick}
+              className="text-[10px] h-auto p-0 font-bold"
+            >
+              LOG IN TO EARN +50 CREDITS
+            </Button>
+          </motion.div>
+        )}
+
         <div className="p-4 bg-card border border-border rounded-xl space-y-2">
           <span className="text-xs uppercase tracking-widest text-muted-foreground font-mono">Detected Pollution</span>
           <div className="flex justify-between items-end">
@@ -471,18 +527,52 @@ function ResultView({ result, onReset }: { result: AnalysisResult; onReset: () =
       </div>
 
       <div className="mt-auto pt-4 space-y-3">
-        <Button onClick={() => { }} className="w-full bg-neon-green text-background hover:bg-neon-green/90 font-mono tracking-wider">
+        <Button onClick={handleEmailClick} className="w-full bg-neon-green text-background hover:bg-neon-green/90 font-mono tracking-wider">
           <FileText className="w-4 h-4 mr-2" />
           FILE OFFICIAL COMPLAINT
-        </Button>
-        <Button onClick={handleEmailClick} className="w-full bg-blue-500 text-white hover:bg-blue-600 font-mono tracking-wider">
-          <FileText className="w-4 h-4 mr-2" />
-          SEND VIA EMAIL
         </Button>
         <Button onClick={onReset} variant="outline" className="w-full border-border hover:bg-secondary font-mono tracking-wider">
           <RotateCcw className="w-4 h-4 mr-2" />
           ANALYZE NEW IMAGE
         </Button>
+      </div>
+    </motion.div>
+  )
+}
+
+function LoginRequiredView({ onLogin }: { onLogin: () => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-6"
+    >
+      <div className="relative">
+        <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full" />
+        <div className="relative bg-card/50 border border-primary/30 p-6 rounded-2xl">
+          <AlertTriangle className="w-12 h-12 text-primary mx-auto mb-4" />
+          <h2 className="text-2xl font-bold font-mono tracking-tighter text-foreground">RESTRICTED ACCESS</h2>
+        </div>
+      </div>
+
+      <div className="space-y-4 max-w-xs">
+        <p className="text-sm text-muted-foreground font-mono leading-relaxed">
+          AI Monitoring and Legal Drafting require an authorized officer session.
+          Please initialize your credentials to proceed.
+        </p>
+
+        <Button
+          onClick={onLogin}
+          className="w-full h-12 bg-primary text-primary-foreground font-mono tracking-widest hover:bg-primary/90 shadow-[0_0_20px_rgba(var(--primary),0.3)]"
+        >
+          INITIALIZE SESSION
+        </Button>
+      </div>
+
+      <div className="flex items-center gap-2 pt-8 opacity-40">
+        <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+        <span className="text-[10px] font-mono tracking-widest">ENCRYPTED LENS READY</span>
       </div>
     </motion.div>
   )
