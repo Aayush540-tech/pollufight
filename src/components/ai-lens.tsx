@@ -16,6 +16,60 @@ const DEMO_KEYWORDS = [
 ];
 
 export function AILens() {
+  const [locationData, setLocationData] = useState<{
+    city?: string;
+    state?: string;
+    zipcode?: string;
+    address?: string;
+  } | null>(null)
+
+  const getDeviceLocation = (): Promise<{ lat: number; lon: number } | null> => {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        resolve(null);
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            lat: position.coords.latitude,
+            lon: position.coords.longitude
+          });
+        },
+        (error) => {
+          console.error("Geolocation error:", error);
+          resolve(null);
+        },
+        { timeout: 5000 }
+      );
+    });
+  };
+
+  const reverseGeocode = async (lat: number, lon: number) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`,
+        {
+          headers: {
+            'Accept-Language': 'en',
+            'User-Agent': 'Jan-Kavch-Pollufight-App'
+          }
+        }
+      );
+      const data = await response.json();
+      const address = data.address || {};
+      return {
+        city: address.city || address.town || address.village || address.suburb || "Unknown City",
+        state: address.state || "Unknown State",
+        zipcode: address.postcode || "000000",
+        address: data.display_name || "Unknown Address"
+      };
+    } catch (error) {
+      console.error("Reverse geocoding error:", error);
+      return null;
+    }
+  };
+
   const [state, setState] = useState<LensState>("capture")
   const [progress, setProgress] = useState(0)
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
@@ -44,6 +98,15 @@ export function AILens() {
       const isDemo = DEMO_KEYWORDS.some(keyword => filename.includes(keyword));
 
       let imageUrl = "skipped";
+      let capturedLocation = null;
+
+      // Start getting location in parallel with upload/prep
+      const locPromise = getDeviceLocation().then(async (coords) => {
+        if (coords) {
+          return await reverseGeocode(coords.lat, coords.lon);
+        }
+        return null;
+      });
 
       if (!isDemo) {
         setState("uploading")
@@ -61,8 +124,14 @@ export function AILens() {
 
       setState("analyzing")
 
+      // Wait for location to finish if it hasn't already
+      capturedLocation = await locPromise;
+      if (capturedLocation) {
+        setLocationData(capturedLocation);
+      }
+
       // Analyze with Pollution Detector
-      const result = await analyzeImage(imageUrl, file.name)
+      const result = await analyzeImage(imageUrl, file.name, capturedLocation || undefined)
       setAnalysisResult(result)
       setProgress(100)
 

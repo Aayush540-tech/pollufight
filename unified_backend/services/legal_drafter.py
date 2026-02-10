@@ -5,12 +5,18 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def generate_legal_draft(pollution_type: str, details: list) -> str:
+def generate_legal_draft(pollution_type: str, details: list, location_data: dict = None) -> str:
     """
     Generates a deterministic legal draft based on the detected pollution type.
     """
     date_str = datetime.date.today().strftime("%B %d, %Y")
     ref_no = f"ENV/COMP/{datetime.date.today().strftime('%Y%m%d')}/001"
+    
+    # Extract location details
+    city = location_data.get('city', '[City Name]') if location_data else '[City Name]'
+    state = location_data.get('state', '[State]') if location_data else '[State]'
+    zip_code = location_data.get('zipcode', '[Zip Code]') if location_data else '[Zip Code]'
+    full_address = location_data.get('address', '[Location/Address]') if location_data else '[Location/Address]'
     
     # Calculate overall confidence (max of individual items)
     confidence_level = 0.0
@@ -41,7 +47,7 @@ Date: {date_str}
 To,
 The Regional Officer / Municipal Commissioner,
 Pollution Control Board / Municipal Corporation,
-[City Name, State, Zip Code]
+{city}, {state}, {zip_code}
 
 SUBJECT: FORMAL COMPLAINT REGARDING {pollution_type.upper()}
 
@@ -49,7 +55,7 @@ SUBJECT: FORMAL COMPLAINT REGARDING {pollution_type.upper()}
    - Pollution Type: {pollution_type}
    - Detection Confidence Level: {confidence_level:.2%}
    - Date of Observation: {date_str}
-   - Location: [Location/Address]
+   - Location: {full_address}
 
 2. EVIDENCE SUMMARY
 The following sources were detected by our automated AI monitoring system:

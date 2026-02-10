@@ -20,7 +20,11 @@ router = APIRouter()
 async def analyze_image(
     file: Optional[UploadFile] = File(None),
     image_url: Optional[str] = Form(None),
-    original_filename: Optional[str] = Form(None)
+    original_filename: Optional[str] = Form(None),
+    city: Optional[str] = Form(None),
+    state: Optional[str] = Form(None),
+    zipcode: Optional[str] = Form(None),
+    address: Optional[str] = Form(None)
 ):
     """Analyze image for pollution detection."""
     try:
@@ -63,7 +67,13 @@ async def analyze_image(
         if pollution_type == "No obvious pollution detected":
             legal_draft = "No significant pollution detected warranting a legal notice."
         else:
-            legal_draft = generate_legal_draft(pollution_type, details)
+            location_data = {
+                "city": city,
+                "state": state,
+                "zipcode": zipcode,
+                "address": address
+            }
+            legal_draft = generate_legal_draft(pollution_type, details, location_data)
 
         return AnalysisResponse(
             pollution_type=pollution_type,
