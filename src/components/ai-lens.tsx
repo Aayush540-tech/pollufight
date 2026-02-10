@@ -8,6 +8,8 @@ import { uploadToCloudinary } from "@/services/cloudinary-service"
 import { analyzeImage, type AnalysisResult } from "@/services/pollution-service"
 import { getApiBaseUrl } from "@/config/api"
 import { db } from "@/lib/firebase"
+import { awardCredits } from "@/services/wallet-service"
+import { getUserId } from "@/lib/user-id"
 
 type LensState = "capture" | "uploading" | "analyzing" | "verified" | "error"
 
@@ -127,8 +129,15 @@ export function AILens() {
       // Save to Firestore for mapping (GUILTY MAP)
       if (result.pollution_type !== "No obvious pollution detected" && result.pollution_type !== "Error") {
         try {
+          // Award credits for high confidence reports
+          if (result.confidence_level > 0.8) {
+            console.log("High confidence detection (>90%). Awarding 50 credits!");
+            await awardCredits(50);
+          }
+
           const { addDoc, collection, serverTimestamp } = await import("firebase/firestore");
           await addDoc(collection(db, "pollution_reports"), {
+            userId: getUserId(), // Associate report with the user
             latitude: capturedLocation?.lat || 28.4595, // Fallback to Gurgaon if GPS fails
             longitude: capturedLocation?.lon || 77.0266,
             type: result.pollution_type.includes("Industrial") ? "Industrial" :

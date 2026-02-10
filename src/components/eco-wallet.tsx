@@ -2,38 +2,20 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { ArrowUp, Clock, Car, Factory, Banknote, Award, Plus, Minus } from "lucide-react"
+import { ArrowUp, Clock, Car, Factory, Banknote, Award, Plus, Minus, HardHat } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { doc, onSnapshot, updateDoc, increment, setDoc } from "firebase/firestore"
+import { doc, onSnapshot, updateDoc, increment, setDoc, query, collection, where, orderBy, QuerySnapshot, DocumentData } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { getUserId } from "@/lib/user-id"
 
-const verificationHistory = [
-  {
-    id: 1,
-    type: "Vehicle Emission",
-    icon: Car,
-    credits: 150,
-    time: "2H AGO",
-    verified: true,
-  },
-  {
-    id: 2,
-    type: "Factory Discharge",
-    icon: Factory,
-    credits: 200,
-    time: "1D AGO",
-    verified: true,
-  },
-  {
-    id: 3,
-    type: "Construction Dust",
-    icon: Factory,
-    credits: 100,
-    time: "3D AGO",
-    verified: true,
-  },
-]
+const TYPE_ICONS: Record<string, any> = {
+  "Vehicle Emission": Car,
+  "Factory Discharge": Factory,
+  "Construction Dust": HardHat,
+  "Industrial": Factory,
+  "Construction": HardHat,
+  "Waste Management": Factory,
+}
 
 function AnimatedCheckmark({ delay }: { delay: number }) {
   return (
@@ -54,8 +36,9 @@ function AnimatedCheckmark({ delay }: { delay: number }) {
 
 export function EcoWallet() {
   const [displayCredits, setDisplayCredits] = useState(0)
-  const [flashingCard, setFlashingCard] = useState<number | null>(null)
+  const [flashingCard, setFlashingCard] = useState<string | null>(null)
   const [userId, setUserId] = useState<string>("")
+  const [history, setHistory] = useState<any[]>([])
 
   // Fetch/Create User and Subscribe to Credits
   useEffect(() => {
@@ -75,14 +58,49 @@ export function EcoWallet() {
             createdAt: new Date(),
             updatedAt: new Date(),
           })
-          // The snapshot listener will fire again with the new data
         } catch (error) {
           console.error("Error creating user document:", error)
         }
       }
     })
 
-    return () => unsubscribe()
+    // Subscribe to User's History
+    const historyQuery = query(
+      collection(db, "pollution_reports"),
+      where("userId", "==", id),
+      orderBy("timestamp", "desc")
+    )
+
+    const historyUnsubscribe = onSnapshot(historyQuery, (snapshot: QuerySnapshot<DocumentData>) => {
+      const reports = snapshot.docs.map(doc => {
+        const data = doc.data()
+        const timestamp = data.timestamp?.toDate()
+        let timeStr = "Just now"
+
+        if (timestamp) {
+          const diff = Math.floor((Date.now() - timestamp.getTime()) / 60000)
+          if (diff < 1) timeStr = "JUST NOW"
+          else if (diff < 60) timeStr = `${diff}M AGO`
+          else if (diff < 1440) timeStr = `${Math.floor(diff / 60)}H AGO`
+          else timeStr = `${Math.floor(diff / 1440)}D AGO`
+        }
+
+        return {
+          id: doc.id,
+          type: data.type || "Pollution Report",
+          credits: data.severity === "critical" ? 50 : 25, // Mock credit values for display
+          time: timeStr,
+          verified: data.status === "resolved",
+          status: data.status
+        }
+      })
+      setHistory(reports)
+    })
+
+    return () => {
+      unsubscribe()
+      historyUnsubscribe()
+    }
   }, [])
 
   const updateCredits = async (amount: number) => {
@@ -99,10 +117,8 @@ export function EcoWallet() {
   }
 
   useEffect(() => {
-    setTimeout(() => {
-      setFlashingCard(1)
-      setTimeout(() => setFlashingCard(null), 600)
-    }, 1000)
+    // We can remove the flashing demo logic since cards are now real or remove it
+    // setFlashingCard("demo") // if we had a string ID
   }, [])
 
   return (
@@ -150,33 +166,45 @@ export function EcoWallet() {
           <h3 className="font-mono text-xs tracking-wider text-muted-foreground">VERIFICATION HISTORY</h3>
         </div>
 
-        {verificationHistory.map((item, index) => {
-          const Icon = item.icon
-          return (
-            <motion.div
-              key={item.id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 + index * 0.1 }}
-              className={`flex items-center justify-between p-4 rounded-xl border bg-card/30 transition-all ${flashingCard === item.id ? "border-neon-green shadow-[0_0_15px_3px_var(--neon-green)]" : "border-border"
-                }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-muted">
-                  <Icon className="w-4 h-4 text-foreground" />
-                </div>
-                <div>
-                  <p className="font-mono text-sm text-foreground">{item.type}</p>
-                  <div className="flex items-center gap-1">
-                    <AnimatedCheckmark delay={0.5 + index * 0.2} />
-                    <p className="font-mono text-[10px] text-neon-green tracking-wider">VERIFIED {item.time}</p>
+        {history.length === 0 ? (
+          <div className="p-8 text-center border border-dashed border-muted-foreground/30 rounded-xl">
+            <p className="font-mono text-xs text-muted-foreground uppercase tracking-widest">
+              No reports filed yet
+            </p>
+          </div>
+        ) : (
+          history.map((item, index) => {
+            const Icon = TYPE_ICONS[item.type] || Factory
+            return (
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 + index * 0.1 }}
+                className={`flex items-center justify-between p-4 rounded-xl border bg-card/30 transition-all ${flashingCard === item.id
+                  ? "border-neon-green shadow-[0_0_15px_3px_var(--neon-green)]"
+                  : "border-border"
+                  }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-muted">
+                    <Icon className="w-4 h-4 text-foreground" />
+                  </div>
+                  <div>
+                    <p className="font-mono text-sm text-foreground">{item.type}</p>
+                    <div className="flex items-center gap-1">
+                      <AnimatedCheckmark delay={0.5 + index * 0.2} />
+                      <p className="font-mono text-[10px] text-neon-green tracking-wider">
+                        {item.status === 'resolved' ? 'VERIFIED' : item.status.toUpperCase()} {item.time}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <p className="font-mono text-lg text-neon-green">+{item.credits}</p>
-            </motion.div>
-          )
-        })}
+                <p className="font-mono text-lg text-neon-green">+{item.credits}</p>
+              </motion.div>
+            )
+          })
+        )}
       </motion.div>
 
       {/* Redeem Button */}
