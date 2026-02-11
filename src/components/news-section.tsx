@@ -19,54 +19,119 @@ interface NewsItem {
 export function NewsSection() {
     const [news, setNews] = useState<NewsItem[]>([])
     const [loading, setLoading] = useState(true)
+    const [refreshing, setRefreshing] = useState(false)
 
-    useEffect(() => {
-        // Simulated fetch of live pollution news
-        // In a production app, this would call a News API filtered by 'pollution', 'environment', etc.
-        const timer = setTimeout(() => {
-            setNews([
+    const fetchNews = async (isRefresh = false) => {
+        if (isRefresh) setRefreshing(true)
+        else setLoading(true)
+
+        try {
+            // Add timestamp to bypass browser caching
+            const response = await fetch(`http://localhost:8000/api/pollution/news?t=${Date.now()}`, {
+                cache: 'no-store'
+            })
+            if (!response.ok) throw new Error("Failed to fetch news")
+            const data = await response.json()
+            console.log("News fetched successfully:", data.length, "items")
+
+            if (!data || data.length === 0) throw new Error("No news items returned")
+
+            // Format relative time if possible, or just use the pubDate
+            const formattedNews = data.map((item: any) => {
+                const date = new Date(item.time)
+                const now = new Date()
+                const diffMs = now.getTime() - date.getTime()
+                const diffMins = Math.floor(diffMs / 60000)
+
+                let timeLabel = item.time
+                if (diffMins < 60) timeLabel = `${diffMins}m ago`
+                else if (diffMins < 1440) timeLabel = `${Math.floor(diffMins / 60)}h ago`
+                else timeLabel = `${Math.floor(diffMins / 1440)}d ago`
+
+                return { ...item, time: timeLabel }
+            })
+
+            setNews(formattedNews)
+        } catch (err) {
+            console.error("News API failed, providing randomized fallback:", err)
+
+            const fallbackPool: NewsItem[] = [
                 {
-                    id: "1",
-                    title: "Faridabad Air Quality Remains 'Very Poor'; Local Authorities Eye GRAP-III Measures",
-                    source: "Environment Desk",
-                    time: "42m ago",
-                    summary: "Local monitoring stations report AQI exceeding 350. Construction bans may be reintroduced to mitigate dust pollution.",
-                    tag: "CRITICAL",
-                    url: "#"
-                },
-                {
-                    id: "2",
-                    title: "New Policy: Mandatory Emission Sensors for Heavy Industrial Units in NCR",
-                    source: "State Gazette",
+                    id: "demo-1",
+                    title: "Policy Update: New Emission Standards for Industrial Zones",
+                    source: "Jan-Kavch Intelligence",
                     time: "2h ago",
-                    summary: "The Environment Ministry has announced a fast-track mandate for IoT-based emission tracking in industrial zones.",
+                    summary: "Recent reports suggest a 15% reduction in particulate matter after the implementation of new industrial scrubbers.",
                     tag: "POLCY",
                     url: "#"
                 },
                 {
-                    id: "3",
-                    title: "Global Summit: UN Highlights Himalayan Glacial Melt Due to Carbon Deposits",
+                    id: "demo-2",
+                    title: "Community Spotlight: Solar Park Expansion in Haryana",
+                    source: "Eco Watch",
+                    time: "5h ago",
+                    summary: "Local energy projects continue to offset carbon footprints of neighboring manufacturing clusters.",
+                    tag: "UPDATE",
+                    url: "#"
+                },
+                {
+                    id: "demo-3",
+                    title: "Global Observation: Himalayan Air Quality Stabilizes",
                     source: "World News",
-                    time: "4h ago",
-                    summary: "New study reveals black carbon from stubble burning is accelerating glacial retreat at record speeds.",
+                    time: "1d ago",
+                    summary: "Satellite data confirms a seasonal improvement in upper atmospheric clarity across the northern belt.",
                     tag: "GLOBAL",
                     url: "#"
                 },
                 {
-                    id: "4",
-                    title: "Community Win: NGO Successfully Restores Yamuna Stretch Near Okhla",
-                    source: "Local Impact",
-                    time: "6h ago",
-                    summary: "Bioremediation techniques have reduced chemical levels by 40% in the selected test stretch over the last quarter.",
+                    id: "demo-4",
+                    title: "Action Alert: GRAP-III Measures Re-evaluated for Weekend",
+                    source: "Pollution Desk",
+                    time: "12m ago",
+                    summary: "Authorities may restrict non-essential construction activities if AQI remains above 400 for 24 hours.",
+                    tag: "CRITICAL",
+                    url: "#"
+                },
+                {
+                    id: "demo-5",
+                    title: "Innovation: AI-Powered Smog Towers Show 30% Efficiency Gain",
+                    source: "Tech Journal",
+                    time: "3h ago",
+                    summary: "New filtration algorithms allow local towers to process 5,000 cubic meters more air per hour.",
                     tag: "UPDATE",
                     url: "#"
+                },
+                {
+                    id: "demo-6",
+                    title: "Policy: Electric Vehicle Subsidy Extended for Goods Carriers",
+                    source: "State Gazette",
+                    time: "6h ago",
+                    summary: "The transport department aims to convert 40% of last-mile delivery fleets to EV by year-end.",
+                    tag: "POLCY",
+                    url: "#"
                 }
-            ])
-            setLoading(false)
-        }, 1000)
+            ]
 
-        return () => clearTimeout(timer)
+            // Shuffle and pick 4 random items for the fallback
+            const randomized = [...fallbackPool]
+                .sort(() => Math.random() - 0.5)
+                .slice(0, 4)
+                .map(item => ({ ...item, id: `${item.id}-${Date.now()}` })) // Ensure unique keys for re-animation
+
+            setNews(randomized)
+        } finally {
+            setLoading(false)
+            setRefreshing(false)
+        }
+    }
+
+    useEffect(() => {
+        fetchNews()
     }, [])
+
+    const handleMoreNews = () => {
+        fetchNews(true)
+    }
 
     const getTagStyle = (tag: string) => {
         switch (tag) {
@@ -142,8 +207,20 @@ export function NewsSection() {
             </div>
 
             {!loading && (
-                <Button variant="outline" className="w-full border-primary/20 hover:bg-primary/5 font-mono text-xs tracking-widest uppercase">
-                    View All Intelligence
+                <Button
+                    variant="outline"
+                    onClick={handleMoreNews}
+                    disabled={refreshing}
+                    className="w-full border-primary/20 hover:bg-primary/5 font-mono text-xs tracking-widest uppercase py-6"
+                >
+                    {refreshing ? (
+                        <div className="flex items-center gap-3">
+                            <span className="w-4 h-4 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
+                            FETCHING INTELLIGENCE...
+                        </div>
+                    ) : (
+                        "Discover More News"
+                    )}
                 </Button>
             )}
         </div>

@@ -10,6 +10,7 @@ import requests
 from ..models.pollution_models import AnalysisResponse
 from ..services.pollution_service import detect_pollution
 from ..services.legal_drafter import generate_legal_draft
+from ..services.news_service import fetch_pollution_news
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,18 @@ async def geodecode(lat: float, lon: float):
     except Exception as e:
         logger.error(f"Geocoding error: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to geodecode coordinates")
+
+
+@router.get("/news")
+async def get_pollution_news():
+    """Fetch live pollution and environmental news."""
+    try:
+        news = fetch_pollution_news()
+        return news
+    except Exception as e:
+        logger.error(f"Error serving news: {e}")
+        # Return empty list instead of 500 to prevent frontend crash
+        return []
 
 
 @router.post("/analyze", response_model=AnalysisResponse)

@@ -2,13 +2,21 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { ArrowUp, Clock, Car, Factory, Banknote, Award, Plus, Minus, HardHat, User as UserIcon } from "lucide-react"
+import { ArrowUp, Clock, Car, Factory, Banknote, Award, HardHat, User as UserIcon, Copy, Ticket } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { doc, onSnapshot, updateDoc, increment, setDoc, query, collection, where, orderBy, QuerySnapshot, DocumentData } from "firebase/firestore"
+import { doc, onSnapshot, setDoc, updateDoc, query, collection, where, orderBy, QuerySnapshot, DocumentData } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { getUserId } from "@/lib/user-id"
 import { useAuth } from "@/context/AuthContext"
 import { AuthModal } from "./AuthModal"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
+import { toast } from "sonner"
 
 const TYPE_ICONS: Record<string, any> = {
   "Vehicle Emission": Car,
@@ -39,15 +47,16 @@ function AnimatedCheckmark({ delay }: { delay: number }) {
 export function EcoWallet() {
   const { user, logout } = useAuth()
   const [displayCredits, setDisplayCredits] = useState(0)
-  const [userId, setUserId] = useState<string>("")
   const [history, setHistory] = useState<any[]>([])
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
+  const [isRedeeming, setIsRedeeming] = useState(false)
+  const [redeemedCoupon, setRedeemedCoupon] = useState<string | null>(null)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
 
   // Fetch/Create User and Subscribe to Credits
   useEffect(() => {
     // Priority: Authenticated User ID > Local Storage User ID
     const id = user?.uid || getUserId()
-    setUserId(id)
     const userRef = doc(db, "user_credits", id)
 
     const unsubscribe = onSnapshot(userRef, async (docSnap) => {
@@ -105,21 +114,45 @@ export function EcoWallet() {
       unsubscribe()
       historyUnsubscribe()
     }
-  }, [])
+  }, [user])
 
-  const updateCredits = async (amount: number) => {
-    if (!userId) return
-    const userRef = doc(db, "user_credits", userId)
+  const handleRedeem = async () => {
+    if (!user && !getUserId()) return
+    if (displayCredits <= 0) {
+      toast.error("You need credits to redeem a subsidy!")
+      return
+    }
+
+    setIsRedeeming(true)
+    const id = user?.uid || getUserId()
+    const userRef = doc(db, "user_credits", id)
+
     try {
+      // Reset credits to 0
       await updateDoc(userRef, {
-        credits: increment(amount),
-        updatedAt: new Date(),
+        credits: 0,
+        updatedAt: new Date()
       })
+
+      // Generate a fun coupon code
+      const coupon = `CITIZEN-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
+      setRedeemedCoupon(coupon)
+      setShowSuccessModal(true)
+      toast.success("Credits redeemed successfully!")
     } catch (error) {
-      console.error("Error updating credits:", error)
+      console.error("Redemption error:", error)
+      toast.error("Failed to redeem credits. Please try again.")
+    } finally {
+      setIsRedeeming(false)
     }
   }
 
+  const copyCoupon = () => {
+    if (redeemedCoupon) {
+      navigator.clipboard.writeText(redeemedCoupon)
+      toast.success("Coupon code copied!")
+    }
+  }
 
   return (
     <div className="p-4 space-y-6">
@@ -237,43 +270,68 @@ export function EcoWallet() {
         )}
       </motion.div>
 
-      {/* Redeem Button */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-        <Button className="w-full font-mono text-xs tracking-wider bg-neon-green text-background hover:bg-neon-green/90 h-12">
-          <Banknote className="w-4 h-4 mr-2" />
-          REDEEM CREDITS
+        <Button
+          className="w-full font-mono text-xs tracking-wider bg-neon-green text-background hover:bg-neon-green/90 h-12"
+          onClick={handleRedeem}
+          disabled={isRedeeming || displayCredits <= 0}
+        >
+          {isRedeeming ? (
+            <div className="flex items-center gap-2">
+              <span className="w-4 h-4 rounded-full border-2 border-background/20 border-t-background animate-spin" />
+              REDEEMING...
+            </div>
+          ) : (
+            <>
+              <Banknote className="w-4 h-4 mr-2" />
+              REDEEM CREDITS
+            </>
+          )}
         </Button>
       </motion.div>
 
-      {/* Test Controls - For Development Only */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.6 }}
-        className="p-4 rounded-xl border border-dashed border-muted-foreground/30 bg-muted/20"
-      >
-        <p className="font-mono text-[10px] text-muted-foreground mb-3 text-center uppercase tracking-widest">
-          Dev Controls (User ID: {userId.slice(0, 15)}...)
-        </p>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="flex-1 font-mono text-xs border-neon-green/50 text-neon-green hover:bg-neon-green/10"
-            onClick={() => updateCredits(100)}
-          >
-            <Plus className="w-3 h-3 mr-2" />
-            Add 100
-          </Button>
-          <Button
-            variant="outline"
-            className="flex-1 font-mono text-xs border-red-500/50 text-red-500 hover:bg-red-500/10"
-            onClick={() => updateCredits(-100)}
-          >
-            <Minus className="w-3 h-3 mr-2" />
-            Remove 100
-          </Button>
-        </div>
-      </motion.div>
+      {/* Redemption Success Modal */}
+      <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
+        <DialogContent className="bg-card/95 backdrop-blur-xl border-border/50 max-w-sm mx-auto rounded-3xl p-8">
+          <DialogHeader className="items-center text-center space-y-4">
+            <div className="w-16 h-16 rounded-full bg-neon-green/10 flex items-center justify-center mb-2">
+              <Award className="w-8 h-8 text-neon-green" />
+            </div>
+            <DialogTitle className="font-mono text-2xl font-bold tracking-tighter text-foreground uppercase text-center">
+              You are the true citizen!
+            </DialogTitle>
+            <DialogDescription className="font-mono text-xs text-muted-foreground leading-relaxed uppercase tracking-widest text-center">
+              Your contribution to the air quality of our city is being rewarded. Use this coupon for your next clean energy subsidy.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="mt-8 space-y-6">
+            <div className="relative group">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-neon-green to-emerald-500 rounded-xl opacity-20 blur group-hover:opacity-40 transition duration-1000"></div>
+              <div className="relative bg-black/40 border border-white/10 rounded-xl p-4 flex flex-col items-center justify-center gap-2">
+                <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-[0.2em]">UNIQUE SUBSIDY CODE</span>
+                <div className="flex items-center gap-3">
+                  <Ticket className="w-5 h-5 text-neon-green" />
+                  <span className="font-mono text-2xl font-bold tracking-widest text-foreground">{redeemedCoupon}</span>
+                </div>
+              </div>
+            </div>
+
+            <Button
+              variant="outline"
+              className="w-full font-mono text-xs tracking-widest border-neon-green/20 hover:bg-neon-green/5 py-6"
+              onClick={copyCoupon}
+            >
+              <Copy className="w-4 h-4 mr-2" />
+              COPY COUPON CODE
+            </Button>
+
+            <p className="text-[10px] font-mono text-center text-muted-foreground uppercase tracking-widest pt-2">
+              Valid for 30 days • Applied to EV/Solar subsidies
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
