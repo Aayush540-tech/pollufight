@@ -40,7 +40,7 @@ export function AILens() {
           console.error("Geolocation error:", error);
           resolve(null);
         },
-        { timeout: 5000 }
+        { timeout: 10000 }
       );
     });
   };
