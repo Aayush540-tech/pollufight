@@ -1,5 +1,6 @@
 "use client"
 
+import { openUrl } from "@tauri-apps/plugin-opener"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Camera, RotateCcw, Upload, FileText, Activity, AlertTriangle, CheckCircle } from "lucide-react"
@@ -443,11 +444,17 @@ function ResultView({
   isGuest: boolean;
   onAuthClick: () => void;
 }) {
-  const handleEmailClick = () => {
+  const handleEmailClick = async () => {
     const recipient = "thenobleonevision070@gmail.com";
     const subject = encodeURIComponent(`Official Complaint: ${result.pollution_type}`);
     const body = encodeURIComponent(result.legal_draft);
-    window.location.href = `mailto:${recipient}?subject=${subject}&body=${body}`;
+    const maillink = `mailto:${recipient}?subject=${subject}&body=${body}`;
+    if ((window as any).__TAURI_INTERNALS__) {
+      await openUrl(maillink);
+    }
+    else {
+      window.location.href = maillink;
+    }
   };
 
   return (
